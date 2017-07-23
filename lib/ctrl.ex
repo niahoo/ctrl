@@ -4,7 +4,7 @@ defmodule Ctrl do
 
   # We will simply transform the AST in the form of a regular `with` call.
   defmacro ctrl([{:do, do_block} | else_catch_rescue] = _input) do
-    IO.inspect _input
+    # IO.inspect _input
     {main_block, meta} =
       case do_block do
         {:__block__, meta, exprs} when is_list(exprs) ->
@@ -27,7 +27,7 @@ defmodule Ctrl do
       end
     with_body = with_clauses ++ [[{:do, body} | else_catch_rescue]]
     ast = {:with, meta, with_body}
-    ast |> Macro.to_string |> IO.puts
+    # ast |> Macro.to_string |> IO.puts
     ast
   end
 
