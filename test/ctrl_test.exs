@@ -226,4 +226,14 @@ defmodule CtrlTest do
     b = C.square_with(-1)
     assert a === b
   end
+
+  test "guard clauses" do
+    val = ctrl do
+      n when is_integer(n) <- 3
+      :tag | x when is_integer(x) <- {:int, n}
+    else
+      :tag | {:int, i} when is_integer(i) and i > 0 -> {:ok, i}
+    end
+    assert val === {:ok, 3}
+  end
 end

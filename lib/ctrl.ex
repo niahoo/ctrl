@@ -4,6 +4,7 @@ defmodule Ctrl do
 
   # We will simply transform the AST in the form of a regular `with` call.
   defmacro ctrl([{:do, do_block} | else_catch_rescue] = _input) do
+    IO.inspect _input
     {main_block, meta} =
       case do_block do
         {:__block__, meta, exprs} when is_list(exprs) ->
@@ -25,7 +26,9 @@ defmodule Ctrl do
           :lists.keyreplace(:else, 1, else_catch_rescue, {:else, elses})
       end
     with_body = with_clauses ++ [[{:do, body} | else_catch_rescue]]
-    _ast = {:with, meta, with_body}
+    ast = {:with, meta, with_body}
+    ast |> Macro.to_string |> IO.puts
+    ast
   end
 
   # Ctrl allow the last clause to have an arrow `<-`. But `with` blocks does not
@@ -47,7 +50,7 @@ defmodule Ctrl do
         # clause
         [] ->
           {:<-, _, [left, _]} = hd(arrow_clauses_reversed)
-          [left |> without_tag]
+          [left |> cleanup_last_clause]
         non_empty ->
           non_empty
       end
@@ -65,6 +68,9 @@ defmodule Ctrl do
       case left do
         {@tag_op, _meta, [tag, inside]} when is_atom(tag) ->
           {{tag, inside}, {tag, right}}
+        {:when, when_meta, [{@tag_op, _meta, [tag, inside]}, when_right]} when is_atom(tag) ->
+          l = {:when, when_meta, [{tag, inside}, when_right]}
+          {l, {tag, right}}
         _normal ->
           {left, right}
       end
@@ -73,14 +79,24 @@ defmodule Ctrl do
   defp wrap_tag(clause) do
     clause
   end
-  defp without_tag({@tag_op, _, [_tag, content]}), do: content
-  defp without_tag(content), do: content
+
+  # If the last clause is set in the body, we must remove tags and guards
+  defp cleanup_last_clause({@tag_op, _, [_tag, content]}),
+    do: cleanup_last_clause(content)
+  defp cleanup_last_clause({:when, _, [content, guards]}),
+    do: cleanup_last_clause(content)
+  defp cleanup_last_clause(content),
+    do: content
 
   defp unwrap_tag({:->, meta, [left_match, right]}) do
     left =
       case left_match do
-        [{@tag_op, _, [tag, value]}] -> [{tag, value}]
-        _untagged -> left_match
+        [{@tag_op, _, [tag, value]}] ->
+          [{tag, value}]
+        [{:when, when_meta, [{@tag_op, _meta, [tag, inside]}, when_right]}] when is_atom(tag) ->
+          [{tag, inside}]
+        _untagged ->
+          left_match
       end
     {:->, meta, [left, right]}
   end
